@@ -10,9 +10,12 @@ from config import PROVIDERS, is_ready, is_visible
 import orchestrator
 from orchestrator import OrchestratorError
 from providers import ProviderError, ask
+from security import guard, startup_warning
 
 log = logging.getLogger("ai_hub")
 app = FastAPI(title="AI Hub")
+app.middleware("http")(guard)
+startup_warning()
 
 
 class ChatRequest(BaseModel):

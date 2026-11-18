@@ -66,3 +66,9 @@ def is_visible(name: str) -> bool:
     """Limited provider csak akkor létezik a felület/API számára, ha van kulcsa."""
     cfg = PROVIDERS[name]
     return is_ready(name) or not cfg["limited"]
+
+
+# ---------- AI Hub védelem (security.py) ----------
+HUB_USER = _env("HUB_USER", "admin")
+HUB_PASSWORD = _env("HUB_PASSWORD")  # üresen: nincs jelszó (csak helyi futtatáshoz!)
+HUB_RATE_LIMIT = int(_env("HUB_RATE_LIMIT", "20"))  # fizetős kérés / perc / IP

@@ -6,7 +6,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 KEYS = ["OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GEMINI_API_KEY",
-        "GITHUB_TOKEN", "PERPLEXITY_API_KEY", "DEEPSEEK_API_KEY"]
+        "GITHUB_TOKEN", "PERPLEXITY_API_KEY", "DEEPSEEK_API_KEY",
+        "HUB_USER", "HUB_PASSWORD", "HUB_RATE_LIMIT"]
 
 
 def load_app(monkeypatch, tmp_path, **env):
@@ -17,7 +18,7 @@ def load_app(monkeypatch, tmp_path, **env):
     monkeypatch.setattr("dotenv.load_dotenv", lambda *a, **kw: False)
     (tmp_path / "static").mkdir()
     monkeypatch.chdir(tmp_path)
-    for mod in ("config", "providers", "orchestrator", "main"):
+    for mod in ("config", "providers", "orchestrator", "security", "main"):
         sys.modules.pop(mod, None)
     main = importlib.import_module("main")
     return main, TestClient(main.app)
