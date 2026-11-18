@@ -15,19 +15,9 @@ def load_app(monkeypatch, tmp_path, **env):
     for k, v in env.items():
         monkeypatch.setenv(k, v)
     monkeypatch.setattr("dotenv.load_dotenv", lambda *a, **kw: False)
-    stub = types.ModuleType("orchestrator")
-
-    async def roundtable(q, ps):
-        return {"mode": "roundtable", "providers": ps}
-
-    async def debate(q, ps):
-        return {"mode": "debate", "providers": ps}
-
-    stub.roundtable, stub.debate = roundtable, debate
-    monkeypatch.setitem(sys.modules, "orchestrator", stub)
     (tmp_path / "static").mkdir()
     monkeypatch.chdir(tmp_path)
-    for mod in ("config", "providers", "main"):
+    for mod in ("config", "providers", "orchestrator", "main"):
         sys.modules.pop(mod, None)
     main = importlib.import_module("main")
     return main, TestClient(main.app)
@@ -68,9 +58,10 @@ def test_multi_rejects_not_ready_and_bad_mode(monkeypatch, tmp_path):
     r = c.post("/api/multi", json={"question": "q", "providers": ["openai", "gemini"]})
     assert r.status_code == 400 and "gemini" in r.json()["detail"]
     r = c.post("/api/multi", json={"question": "q", "providers": ["openai"], "mode": "x"})
-    assert r.status_code == 400
-    r = c.post("/api/multi", json={"question": "q", "providers": ["openai"]})
-    assert r.status_code == 200
+    assert r.status_code == 422
+    r = c.post("/api/multi", json={"question": "q", "providers": ["openai"], "rounds": 99,
+                                   "mode": "debate"})
+    assert r.status_code == 422
 
 
 def test_openai_compatible_uses_own_key_and_base_url(monkeypatch, tmp_path):
@@ -113,3 +104,17 @@ def test_upstream_error_is_502_without_details(monkeypatch, tmp_path):
     monkeypatch.setitem(providers._DISPATCH, "anthropic", boom)
     r = c.post("/api/chat", json={"provider": "anthropic", "messages": []})
     assert r.status_code == 502 and "secret" not in r.json()["detail"]
+
+
+def test_multi_compare_end_to_end(monkeypatch, tmp_path):
+    _, c = load_app(monkeypatch, tmp_path, OPENAI_API_KEY="sk-x", ANTHROPIC_API_KEY="a")
+    orch = sys.modules["orchestrator"]
+
+    async def fake_ask(p, m):
+        return p + "!"
+
+    monkeypatch.setattr(orch, "ask", fake_ask)
+    r = c.post("/api/multi", json={"question": "q", "providers": ["openai", "anthropic"],
+                                   "mode": "compare"})
+    assert r.status_code == 200
+    assert r.json()["answers"] == {"openai": "openai!", "anthropic": "anthropic!"}

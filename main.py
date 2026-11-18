@@ -1,13 +1,14 @@
 import logging
-from typing import Dict, List
+from typing import Dict, List, Literal, Optional
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from config import PROVIDERS, is_ready, is_visible
-from orchestrator import debate, roundtable
+import orchestrator
+from orchestrator import OrchestratorError
 from providers import ProviderError, ask
 
 log = logging.getLogger("ai_hub")
@@ -20,9 +21,11 @@ class ChatRequest(BaseModel):
 
 
 class MultiRequest(BaseModel):
-    question: str
-    providers: List[str]
-    mode: str = "roundtable"
+    question: str = Field(min_length=1, max_length=20_000)
+    providers: List[str] = Field(min_length=1, max_length=10)
+    mode: Literal["compare", "roundtable", "debate", "critique"] = "roundtable"
+    rounds: int = Field(2, ge=1, le=orchestrator.MAX_ROUNDS)  # csak debate
+    lead: Optional[str] = None  # csak critique
 
 
 @app.get("/api/providers")
@@ -54,8 +57,6 @@ async def chat(req: ChatRequest):
 
 @app.post("/api/multi")
 async def multi(req: MultiRequest):
-    if req.mode not in ("roundtable", "debate"):
-        raise HTTPException(400, f"Ismeretlen mód: {req.mode}")
     unknown = [p for p in req.providers if p not in PROVIDERS or not is_visible(p)]
     if unknown:
         raise HTTPException(400, f"Ismeretlen: {unknown}")
@@ -63,10 +64,14 @@ async def multi(req: MultiRequest):
     if not_ready:
         raise HTTPException(400, f"Nincs API kulcs: {not_ready}")
     try:
+        if req.mode == "compare":
+            return await orchestrator.compare(req.question, req.providers)
         if req.mode == "debate":
-            return await debate(req.question, req.providers)
-        return await roundtable(req.question, req.providers)
-    except ProviderError as e:
+            return await orchestrator.debate(req.question, req.providers, req.rounds)
+        if req.mode == "critique":
+            return await orchestrator.critique(req.question, req.providers, req.lead)
+        return await orchestrator.roundtable(req.question, req.providers)
+    except (ProviderError, OrchestratorError) as e:
         raise HTTPException(400, str(e))
     except Exception:
         log.exception("multi hiba")
