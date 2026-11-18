@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Hub</title>
+<style>
+  :root {
+    --bg: #f6f7f9;
+    --card: #ffffff;
+    --border: #e2e5ea;
+    --text: #1f2328;
+    --muted: #6b7280;
+    --accent: #2563eb;
+    --accent-soft: #dbeafe;
+    --ok: #16a34a;
+    --warn: #d97706;
+    --err: #dc2626;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+  }
+  header {
+    background: var(--card);
+    border-bottom: 1px solid var(--border);
+    padding: 1rem 2rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+    justify-content: space-between;
+  }
+  header h1 { margin: 0; font-size: 1.25rem; }
+  header .sub { color: var(--muted); font-size: 0.85rem; }
+  main {
+    max-width: 1000px;
+    margin: 1.5rem auto;
+    padding: 0 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1rem 1.25rem;
+  }
+  .card h3 {
+    margin: 0 0 0.75rem;
+    font-size: 0.95rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+  }
+  .providers { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+  .provider {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.4rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: #fff;
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.9rem;
+    color: inherit;
+    transition: all 0.15s;
+    user-select: none;
+  }
+  .provider:hover { border-color: var(--accent); }
+  .provider:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .provider.active {
+    background: var(--accent-soft);
+    border-color: var(--accent);
+    color: var(--accent);
+    font-weight: 600;
+  }
+  .provider:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: #f3f4f6;
+  }
+  .provider .badge {
+    font-size: 0.7rem;
+    padding: 0.05rem 0.4rem;
+    border-radius: 4px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+  }
+  .badge.limited { background: #fef3c7; color: var(--warn); }
+  .badge.ready   { background: #dcfce7; color: var(--ok); }
+  .badge.off     { background: #f3f4f6; color: var(--muted); }
+
+  textarea {
+    width: 100%;
+    min-height: 90px;
+    padding: 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 0.95rem;
+    resize: vertical;
+  }
+  textarea:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
+
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: center;
+    margin-top: 0.75rem;
+  }
+  .controls label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.9rem;
+    color: var(--muted);
+  }
+  .controls .hint { font-size: 0.8rem; color: var(--muted); }
+  select, input[type="number"] {
+    padding: 0.35rem 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 0.9rem;
+  }
+  input[type="number"] { width: 60px; }
+  button#send {
+    padding: 0.55rem 1.1rem;
+    border: none;
+    border-radius: 8px;
+    background: var(--accent);
+    color: #fff;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 0.95rem;
+  }
+  button#send:hover { background: #1d4ed8; }
+  button#send:disabled { background: #9ca3af; cursor: wait; }
+
+  #output { min-height: 120px; }
+  .placeholder { color: var(--muted); font-style: italic; }
+  .error {
+    color: var(--err);
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    padding: 0.75rem;
+    border-radius: 8px;
+  }
+  .loading {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--muted);
+  }
+  .spinner {
+    width: 16px; height: 16px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .answer {
+    border-left: 3px solid var(--accent);
+    padding: 0.5rem 0.75rem;
+    margin: 0.5rem 0;
+    background: #fafbfc;
+    border-radius: 0 6px 6px 0;
+  }
+  .answer .who {
+    font-weight: 700;
+    font-size: 0.85rem;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    display: block;
+    margin-bottom: 0.25rem;
+  }
+  .answer pre {
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin: 0;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 0.85rem;
+  }
+  .answer.failed { border-left-color: var(--err); background: #fef2f2; }
+  .answer.failed .who { color: var(--err); }
+  .section-title {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+    margin: 1rem 0 0.25rem;
+    font-weight: 700;
+  }
+  details summary {
+    cursor: pointer;
+    font-weight: 600;
+    color: var(--accent);
+    margin: 0.5rem 0;
+    font-size: 0.9rem;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>AI Hub</h1>
+    <div class="sub">Több AI egy felületen – összehasonlítás, kerekasztal, vita, kritika</div>
+  </div>
+  <div id="status" class="sub" aria-live="polite">betöltés…</div>
+</header>
+
+<main>
+
+  <!-- 1. PROVIDEREK -->
+  <section class="card">
+    <h3>Elérhető AI-k</h3>
+    <div id="providers" class="providers">
+      <span class="placeholder">Betöltés…</span>
+    </div>
+  </section>
+
+  <!-- 2. KÉRDÉS -->
+  <section class="card">
+    <h3>Kérdés</h3>
+    <textarea id="question" maxlength="20000"
+      placeholder="Írd be a kérdést, amit fel szeretnél tenni… (Ctrl+Enter = küldés)"></textarea>
+    <div class="controls">
+      <label>Mód:
+        <select id="mode">
+          <option value="single">Egy AI</option>
+          <option value="compare">Összehasonlítás</option>
+          <option value="roundtable" selected>Kerekasztal</option>
+          <option value="debate">Vita</option>
+          <option value="critique">Kritika + javítás</option>
+        </select>
+      </label>
+      <label id="rounds-label" hidden>Körök:
+        <input id="rounds" type="number" value="2" min="1" max="4">
+      </label>
+      <label id="lead-label" hidden>Fő AI:
+        <select id="lead"></select>
+      </label>
+      <button id="send">Küldés</button>
+      <span id="hint" class="hint"></span>
+    </div>
+  </section>
+
+  <!-- 3. EREDMÉNY -->
+  <section class="card">
+    <h3>Eredmény</h3>
+    <div id="output" class="placeholder" aria-live="polite">—</div>
+  </section>
+
+</main>
+
+<script>
+// ---------- állapot -------------------------------------------------------
+const MAX_ROUNDS = 4;          // egyezzen a backend orchestrator.MAX_ROUNDS-szal
+const MAX_PROVIDERS = 10;      // egyezzen a backend MultiRequest korlátjával
+
+const state = {
+  providers: [],       // [{name, model, ready, limited}]
+  selected: new Set(),
+  lead: null,
+};
+
+const $ = (id) => document.getElementById(id);
+
+// ---------- segédek -------------------------------------------------------
+function showError(target, message) {
+  target.className = '';
+  target.replaceChildren();
+  const div = document.createElement('div');
+  div.className = 'error';
+  div.textContent = message;
+  target.appendChild(div);
+}
+
+// A FastAPI 422-es válaszában a detail egy lista, máshol szöveg.
+function describeDetail(detail, status) {
+  if (typeof detail === 'string') return detail;
+  if (Array.isArray(detail)) {
+    return detail.map(d => {
+      const field = Array.isArray(d.loc) ? d.loc.filter(x => x !== 'body').join('.') : '';
+      return field ? `${field}: ${d.msg}` : d.msg;
+    }).join('; ');
+  }
+  return 'HTTP ' + status;
+}
+
+async function readJson(r) {
+  try { return await r.json(); } catch { return {}; }  // pl. proxy HTML hibaoldal
+}
+
+// ---------- providerek betöltése -----------------------------------------
+async function loadProviders() {
+  try {
+    const r = await fetch('/api/providers');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const data = await r.json();
+    state.providers = data.providers || [];
+    renderProviders();
+    renderLeadOptions();
+    updateStatus();
+  } catch (e) {
+    showError($('providers'), 'Nem sikerült betölteni: ' + e.message);
+    $('status').textContent = 'hiba';
+  }
+}
+
+function renderProviders() {
+  const box = $('providers');
+  box.replaceChildren();
+  if (state.providers.length === 0) {
+    const ph = document.createElement('span');
+    ph.className = 'placeholder';
+    ph.textContent = 'Nincs konfigurált provider.';
+    box.appendChild(ph);
+    return;
+  }
+  state.providers.forEach(p => {
+    // <button> → billentyűzettel is kiválasztható
+    const el = document.createElement('button');
+    el.type = 'button';
+    el.className = 'provider';
+    el.disabled = !p.ready;
+    const isOn = state.selected.has(p.name);
+    if (isOn) el.classList.add('active');
+    el.setAttribute('aria-pressed', String(isOn));
+
+    const name = document.createElement('span');
+    name.textContent = p.name;
+    el.appendChild(name);
+
+    const addBadge = (cls, text) => {
+      const b = document.createElement('span');
+      b.className = 'badge ' + cls;
+      b.textContent = text;
+      el.appendChild(b);
+    };
+    // A Limited jelzés akkor is látszik, ha a provider használható.
+    if (p.limited) addBadge('limited', 'Limited');
+    if (p.ready) addBadge('ready', 'ready');
+    else addBadge('off', 'nincs kulcs');
+
+    if (p.ready) {
+      el.title = `${p.model}${p.limited ? ' (korlátozott hozzáférés – érzékeny adatot ne küldj)' : ''}`;
+      el.onclick = () => {
+        if (state.selected.has(p.name)) state.selected.delete(p.name);
+        else state.selected.add(p.name);
+        renderProviders();
+        renderLeadOptions();
+        updateHint();
+      };
+    } else {
+      el.title = p.limited
+        ? 'Korlátozott hozzáférés – nincs API kulcs a .env-ben'
+        : 'Nincs API kulcs a .env-ben';
+    }
+    box.appendChild(el);
+  });
+}
+
+// A fő AI csak a kiválasztottak közül lehet (a backend ezt ellenőrzi).
+function renderLeadOptions() {
+  const lead = $('lead');
+  const chosen = [...state.selected];
+  lead.replaceChildren(...chosen.map(name => {
+    const o = document.createElement('option');
+    o.value = name;
+    o.textContent = name;
+    return o;
+  }));
+  if (!chosen.includes(state.lead)) state.lead = chosen[0] || null;
+  if (state.lead) lead.value = state.lead;
+}
+$('lead').addEventListener('change', () => { state.lead = $('lead').value; });
+
+function updateStatus() {
+  const ready = state.providers.filter(p => p.ready).length;
+  $('status').textContent = `${ready} / ${state.providers.length} provider elérhető`;
+}
+
+// ---------- mód-váltás ---------------------------------------------------
+function minProviders(mode) { return mode === 'single' ? 1 : 2; }
+
+function updateHint() {
+  const m = $('mode').value;
+  const n = state.selected.size;
+  let msg = '';
+  if (m === 'single' && n > 1) msg = 'Egy AI módban pontosan 1-et válassz.';
+  else if (n < minProviders(m)) msg = `Ehhez a módhoz legalább ${minProviders(m)} AI kell.`;
+  else if (n > MAX_PROVIDERS) msg = `Legfeljebb ${MAX_PROVIDERS} AI választható.`;
+  $('hint').textContent = msg;
+}
+
+$('mode').addEventListener('change', () => {
+  const m = $('mode').value;
+  $('rounds-label').hidden = (m !== 'debate');
+  $('lead-label').hidden   = (m !== 'critique');
+  updateHint();
+});
+
+// ---------- küldés --------------------------------------------------------
+let inFlight = null;
+
+async function send() {
+  if (inFlight) return;   // dupla kattintás ne indítson két (fizetős) kérést
+  const question = $('question').value.trim();
+  const mode = $('mode').value;
+  const out = $('output');
+
+  if (!question) return showError(out, 'Írj be egy kérdést.');
+
+  const providers = [...state.selected];
+  if (mode === 'single' && providers.length !== 1)
+    return showError(out, 'Egy AI módban pontosan 1 AI-t válassz.');
+  if (providers.length < minProviders(mode))
+    return showError(out, `Ehhez a módhoz legalább ${minProviders(mode)} AI kell.`);
+  if (providers.length > MAX_PROVIDERS)
+    return showError(out, `Legfeljebb ${MAX_PROVIDERS} AI választható.`);
+
+  const body = { question, providers, mode };
+  if (mode === 'debate') {
+    const n = parseInt($('rounds').value, 10);
+    body.rounds = Math.min(MAX_ROUNDS, Math.max(1, Number.isFinite(n) ? n : 2));
+    $('rounds').value = body.rounds;
+  }
+  if (mode === 'critique') body.lead = state.lead;
+
+  $('send').disabled = true;
+  out.className = '';
+  out.innerHTML = '<div class="loading"><span class="spinner"></span> Fut… (több kör esetén ez percekig is tarthat)</div>';
+
+  inFlight = new AbortController();
+  try {
+    const r = await fetch('/api/multi', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: inFlight.signal,
+    });
+    const data = await readJson(r);
+    if (!r.ok) throw new Error(describeDetail(data.detail, r.status));
+    renderResult(data);
+  } catch (e) {
+    showError(out, 'Hiba: ' + e.message);
+  } finally {
+    inFlight = null;
+    $('send').disabled = false;
+  }
+}
+
+$('send').addEventListener('click', send);
+$('question').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); send(); }
+});
+
+// ---------- eredmény renderelése -----------------------------------------
+function renderAnswers(target, answers = {}, errors = {}) {
+  for (const [name, text] of Object.entries(answers)) target.appendChild(answerBlock(name, text));
+  for (const [name, msg] of Object.entries(errors || {})) {
+    if (msg) target.appendChild(answerBlock(name, msg, true));
+  }
+}
+
+function renderResult(data) {
+  const out = $('output');
+  out.className = '';
+  out.replaceChildren();
+  const errs = data.errors || {};
+
+  switch (data.mode) {
+    case 'single': {
+      out.appendChild(answerBlock(data.provider, data.answer));
+      break;
+    }
+    case 'compare': {
+      renderAnswers(out, data.answers, errs);
+      break;
+    }
+    case 'roundtable': {
+      out.appendChild(sectionTitle('1. kör – független válaszok'));
+      renderAnswers(out, data.round1, errs.round1);
+      out.appendChild(sectionTitle('2. kör – értékelés és összesítés'));
+      renderAnswers(out, data.round2, errs.round2);
+      break;
+    }
+    case 'debate': {
+      data.history.forEach((round, i) => {
+        const d = document.createElement('details');
+        d.open = (i === data.history.length - 1);
+        const s = document.createElement('summary');
+        s.textContent = `${round.round}. kör`;
+        d.appendChild(s);
+        renderAnswers(d, round.answers, round.errors);
+        out.appendChild(d);
+      });
+      break;
+    }
+    case 'critique': {
+      out.appendChild(sectionTitle(`Kezdeti válasz – ${data.lead}`));
+      out.appendChild(answerBlock(data.lead, data.initial));
+      out.appendChild(sectionTitle('Kritikák'));
+      renderAnswers(out, data.critiques, errs.critiques);
+      out.appendChild(sectionTitle('Javított válasz'));
+      if (errs.final) out.appendChild(answerBlock(data.lead + ' (javítás)', errs.final, true));
+      out.appendChild(answerBlock(data.lead + (errs.final ? ' (eredeti marad)' : ' (javított)'), data.final));
+      break;
+    }
+    default: {
+      const pre = document.createElement('pre');
+      pre.textContent = JSON.stringify(data, null, 2);
+      out.appendChild(pre);
+    }
+  }
+}
+
+function sectionTitle(text) {
+  const el = document.createElement('div');
+  el.className = 'section-title';
+  el.textContent = text;
+  return el;
+}
+
+function answerBlock(who, text, failed = false) {
+  const div = document.createElement('div');
+  div.className = 'answer';
+  if (failed) div.classList.add('failed');
+
+  const w = document.createElement('span');
+  w.className = 'who';
+  w.textContent = failed ? `${who} – hiba` : who;
+  div.appendChild(w);
+
+  const pre = document.createElement('pre');
+  pre.textContent = text ?? '';
+  div.appendChild(pre);
+  return div;
+}
+
+// ---------- indítás -------------------------------------------------------
+loadProviders();
+updateHint();
+$('question').focus();
+</script>
+</body>
+</html>

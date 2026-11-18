@@ -118,3 +118,18 @@ def test_multi_compare_end_to_end(monkeypatch, tmp_path):
                                    "mode": "compare"})
     assert r.status_code == 200
     assert r.json()["answers"] == {"openai": "openai!", "anthropic": "anthropic!"}
+
+
+def test_multi_single_mode(monkeypatch, tmp_path):
+    _, c = load_app(monkeypatch, tmp_path, OPENAI_API_KEY="sk-x", ANTHROPIC_API_KEY="a")
+    orch = sys.modules["orchestrator"]
+
+    async def fake_ask(p, m):
+        return p + "!"
+
+    monkeypatch.setattr(orch, "ask", fake_ask)
+    r = c.post("/api/multi", json={"question": "q", "providers": ["openai"], "mode": "single"})
+    assert r.status_code == 200 and r.json()["answer"] == "openai!"
+    r = c.post("/api/multi", json={"question": "q", "providers": ["openai", "anthropic"],
+                                   "mode": "single"})
+    assert r.status_code == 400

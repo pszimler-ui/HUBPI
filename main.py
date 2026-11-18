@@ -23,7 +23,7 @@ class ChatRequest(BaseModel):
 class MultiRequest(BaseModel):
     question: str = Field(min_length=1, max_length=20_000)
     providers: List[str] = Field(min_length=1, max_length=10)
-    mode: Literal["compare", "roundtable", "debate", "critique"] = "roundtable"
+    mode: Literal["single", "compare", "roundtable", "debate", "critique"] = "roundtable"
     rounds: int = Field(2, ge=1, le=orchestrator.MAX_ROUNDS)  # csak debate
     lead: Optional[str] = None  # csak critique
 
@@ -64,6 +64,10 @@ async def multi(req: MultiRequest):
     if not_ready:
         raise HTTPException(400, f"Nincs API kulcs: {not_ready}")
     try:
+        if req.mode == "single":
+            if len(set(req.providers)) != 1:
+                raise HTTPException(400, "Egy AI módban pontosan 1 providert válassz.")
+            return await orchestrator.single(req.question, req.providers[0])
         if req.mode == "compare":
             return await orchestrator.compare(req.question, req.providers)
         if req.mode == "debate":
@@ -73,6 +77,8 @@ async def multi(req: MultiRequest):
         return await orchestrator.roundtable(req.question, req.providers)
     except (ProviderError, OrchestratorError) as e:
         raise HTTPException(400, str(e))
+    except HTTPException:
+        raise
     except Exception:
         log.exception("multi hiba")
         raise HTTPException(502, "A több-modelles hívás sikertelen.")
