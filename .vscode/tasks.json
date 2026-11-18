@@ -1,0 +1,18 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Függőségek telepítése",
+      "type": "shell",
+      "command": "${command:python.interpreterPath} -m pip install -r requirements.txt",
+      "problemMatcher": []
+    },
+    {
+      "label": "Tesztek",
+      "type": "shell",
+      "command": "${command:python.interpreterPath} -m pytest -q tests",
+      "group": { "kind": "test", "isDefault": true },
+      "problemMatcher": []
+    }
+  ]
+}
